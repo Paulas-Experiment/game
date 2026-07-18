@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Paulas Chemie Experiment</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #111;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 450px;
+            background: #1a1a24;
+            border: 4px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #14141c;
+        }
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(15, 15, 25, 0.9);
+            color: #fff;
+            text-align: center;
+            z-index: 10;
+        }
+        h1 {
+            font-size: 38px;
+            color: #ff5e97;
+            text-shadow: 3px 3px 0px #00ffff;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+        h2 {
+            font-size: 28px;
+            color: #00ffcc;
+            margin-bottom: 15px;
+        }
+        p {
+            font-size: 14px;
+            margin-bottom: 20px;
+            color: #ccc;
+            max-width: 80%;
+            line-height: 1.4;
+        }
+        .btn-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            width: 80%;
+            max-width: 400px;
+        }
+        button {
+            background-color: #382b5c;
+            color: #fff;
+            border: 3px solid #ff5e97;
+            padding: 12px 10px;
+            font-size: 16px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 4px 4px 0px #000;
+            transition: transform 0.1s, background-color 0.1s;
+        }
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px #000;
+        }
+        button:hover {
+            background-color: #4c3b7a;
+            border-color: #00ffcc;
+        }
+        .btn-full {
+            grid-column: span 2;
+        }
+        #game-over-screen, #victory-screen {
+            display: none;
+        }
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            color: #fff;
+            font-size: 18px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 5;
+            text-shadow: 2px 2px 0px #000;
+        }
+        .hud-item span {
+            color: #00ffcc;
+        }
+        #touch-instruction {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 11px;
+            pointer-events: none;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="hud">
+        <div class="hud-item">PUNKTE: <span id="hud-score">0</span></div>
+        <div class="hud-item" id="hud-mode-container">MODUS: <span id="hud-mode">LAUFEN</span></div>
+        <div class="hud-item" id="hud-highscore-container" style="display: none;">BESTE: <span id="hud-highscore">0</span></div>
+        <div class="hud-item"><span id="hud-level-name">LEVEL 1</span></div>
+    </div>
+
+    <div id="start-menu" class="overlay">
+        <h1>Paulas Chemie Experiment</h1>
+        <p>Hilf Paula beim riskanten Laborlauf! Weiche Kisten, Säurefässern und Warnschildern aus. Sammle bunte Kolben.</p>
+        <div class="btn-grid">
+            <button onclick="startGame(1)">LEVEL 1<br><small style="font-size:10px;color:#aaa;">Extrem lange Strecke (Speed-Start)</small></button>
+            <button onclick="startGame(2)">LEVEL 2<br><small style="font-size:10px;color:#aaa;">Lange Strecke (Noch schneller!)</small></button>
+            <button onclick="startGame(3)">LEVEL 3<br><small style="font-size:10px;color:#aaa;">Überschall-Modus (Extrem)</small></button>
+            <button onclick="startGame('endless')">ENDLOSMODUS<br><small style="font-size:10px;color:#aaa;">Wird permanent schneller!</small></button>
+        </div>
+    </div>
+
+    <div id="game-over-screen" class="overlay">
+        <h1 style="color: #ff3333; text-shadow: 3px 3px 0px #550000;">FEHLGESCHLAGEN!</h1>
+        <h2 id="go-title">Kollision im Labor!</h2>
+        <p id="go-stats">Erreichte Punkte: 0</p>
+        <div class="btn-grid">
+            <button class="btn-full" onclick="restartGame()">Erneut versuchen</button>
+            <button class="btn-full" onclick="showMenu()">Hauptmenü</button>
+        </div>
+    </div>
+
+    <div id="victory-screen" class="overlay">
+        <h1 style="color: #33ff33; text-shadow: 3px 3px 0px #005500;">ERFOLGREICH!</h1>
+        <h2 id="vic-title">Level abgeschlossen!</h2>
+        <p id="vic-stats">Daten gesichert. Punkte: 0</p>
+        <div class="btn-grid">
+            <button class="btn-full" id="next-level-btn" onclick="nextLevel()">Nächstes Level</button>
+            <button class="btn-full" onclick="showMenu()">Hauptmenü</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="450"></canvas>
+    <div id="touch-instruction">Tippen zum Springen / Gedrückt halten zum Fliegen</div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const startMenu = document.getElementById('start-menu');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const victoryScreen = document.getElementById('victory-screen');
+    const hudScore = document.getElementById('hud-score');
+    const hudMode = document.getElementById('hud-mode');
+    const hudLevelName = document.getElementById('hud-level-name');
+    const hudHighscoreContainer = document.getElementById('hud-highscore-container');
+    const hudHighscore = document.getElementById('hud-highscore');
+    const goStats = document.getElementById('go-stats');
+    const vicStats = document.getElementById('vic-stats');
+    const vicTitle = document.getElementById('vic-title');
+    const nextLevelBtn = document.getElementById('next-level-btn');
+
+    let gameActive = false;
+    let currentLevel = 1; 
+    let score = 0;
+    let highscore = localStorage.getItem('paula_highscore') || 0;
+    let gameTime = 0;
+    let distanceToVictory = 0;
+    let isPressed = false;
+    let loopId = null;
+    let lastTime = 0; 
+
+    // Physikkonstanten (Perfekt ausbalanciert auf das neue Highspeed-Tempo)
+    const gravity = 1.2;         
+    const flightThrust = -2.1;    
+    const terminalVelocity = 26.0; 
+    const floorY = 380;           
+
+    let cameraX = 0;
+    let player = {};
+    let obstacles = [];
+    let collectables = [];
+    let portals = [];
+    let particles = [];
+    let lastGeneratedX = 400;
+    let portalActive = false;
+    let currentGeneratorMode = 'run';
+
+    window.addEventListener('keydown', function(e) {
+        if (e.code === 'Space') {
+            e.preventDefault();
+            if (!isPressed) {
+                isPressed = true;
+                handleActionStart();
+            }
+        }
+    });
+
+    window.addEventListener('keyup', function(e) {
+        if (e.code === 'Space') {
+            e.preventDefault();
+            isPressed = false;
+        }
+    });
+
+    window.addEventListener('touchstart', function(e) {
+        if (e.target.tagName === 'BUTTON') return;
+        e.preventDefault();
+        isPressed = true;
+        handleActionStart();
+    }, { passive: false });
+
+    window.addEventListener('touchend', function(e) {
+        if (e.target.tagName === 'BUTTON') return;
+        e.preventDefault();
+        isPressed = false;
+    }, { passive: false });
+
+    function handleActionStart() {
+        if (!gameActive) return;
+        if (player.mode === 'run' && player.onGround) {
+            player.vy = -23.5; // Erhöhte Sprungkraft, passend zum neuen Top-Speed!
+            player.onGround = false;
+            createExplosion(player.x + 16, player.y + 32, '#888', 6);
+        }
+    }
+
+    // --- PAULA GRAPHICS ---
+    function drawPaula(ctx, x, y, frame, mode, vy) {
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        const pSize = 2; 
+
+        let paulaSprite = [
+            [0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0], [0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+            [0,1,1,1,2,2,2,2,1,1,1,1,0,0,0,0], [0,1,1,2,2,3,3,3,3,2,1,1,0,0,0,0],
+            [1,1,2,3,3,3,3,3,3,3,2,1,1,0,0,0], [1,1,3,3,9,9,3,9,9,3,2,1,1,0,0,0], 
+            [1,1,3,3,9,7,3,9,7,3,1,1,1,0,0,0], [0,1,3,3,3,3,3,3,3,3,1,1,1,0,0,0],
+            [0,1,1,3,3,3,6,3,3,1,1,1,0,0,0,0], [0,0,1,1,4,4,4,4,4,1,1,0,0,0,0,0], 
+            [0,0,0,4,4,4,4,4,4,4,0,0,0,0,0,0], [0,0,4,4,5,4,4,4,5,4,4,0,0,0,0,0],
+            [0,4,4,4,5,4,4,4,5,4,4,4,0,0,0,0], [0,4,4,4,4,6,6,6,4,4,4,4,0,0,0,0], 
+            [0,4,4,4,4,4,4,4,4,4,4,4,0,0,0,0], [0,4,4,4,4,4,4,4,4,4,4,4,0,0,0,0],
+            [0,0,4,4,4,4,4,4,4,4,4,0,0,0,0,0], [0,0,4,4,4,4,4,4,4,4,4,0,0,0,0,0],
+            [0,0,1,1,4,4,4,4,4,1,1,0,0,0,0,0], [0,0,0,0,3,3,0,3,3,0,0,0,0,0,0,0], 
+            [0,0,0,0,3,3,0,3,3,0,0,0,0,0,0,0], [0,0,0,6,6,6,0,6,6,6,0,0,0,0,0,0], 
+            [0,0,0,6,6,6,0,6,6,6,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        ];
+
+        if (mode === 'fly') {
+            paulaSprite = [
+                [0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0], [0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+                [0,1,1,1,2,2,2,2,1,1,1,1,0,0,0,0], [0,1,1,2,2,3,3,3,3,2,1,1,0,0,0,0],
+                [1,1,2,3,3,3,3,3,3,3,2,1,1,0,0,0], [1,1,3,3,9,9,3,9,9,3,2,1,1,0,0,0],
+                [1,1,3,3,9,7,3,9,7,3,1,1,1,0,0,0], [0,1,3,3,3,3,3,3,3,3,1,1,1,0,0,0],
+                [0,1,1,4,4,4,4,4,4,1,1,1,0,0,0,0], [0,0,4,4,4,4,4,4,4,4,1,0,0,0,0,0],
+                [0,0,8,8,8,8,8,8,8,8,0,0,0,0,0,0], [0,8,8,5,5,5,5,5,5,8,8,0,0,0,0,0],
+                [8,8,5,5,5,5,5,5,5,5,8,8,0,0,0,0], [8,8,5,5,1,1,1,1,5,5,8,8,0,0,0,0], 
+                [8,8,5,1,1,1,1,1,1,5,8,8,0,0,0,0], [8,8,5,1,1,1,1,1,1,5,8,8,0,0,0,0],
+                [0,8,8,5,5,1,1,5,5,8,8,0,0,0,0,0], [0,0,8,8,8,8,8,8,8,8,0,0,0,0,0,0],
+                [0,0,0,6,6,6,6,6,6,0,0,0,0,0,0,0], [0,0,6,6,6,6,6,6,6,6,0,0,0,0,0,0],
+                [0,0,6,6,0,0,0,0,6,6,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+            ];
+        }
+
+        let walkOffset = 0;
+        if (mode === 'run' && !player.onGround) {
+            walkOffset = -2;
+        } else if (mode === 'run') {
+            walkOffset = Math.floor(Math.sin(frame * 0.3) * 2); // Schnellere Beinanimation
+        }
+
+        const colors = {
+            1: '#ff5e97', 2: '#c23b69', 3: '#ffdbac', 4: '#ffffff', 
+            5: '#d0d0d8', 6: '#333333', 7: '#000000', 8: '#00ffcc', 9: '#00ffff'  
+        };
+
+        for (let row = 0; row < 24; row++) {
+            for (let col = 0; col < 16; col++) {
+                let colorKey = paulaSprite[row][col];
+                if (colorKey !== 0) {
+                    ctx.fillStyle = colors[colorKey];
+                    let drawY = y + row * pSize;
+                    let drawX = x + col * pSize;
+
+                    if (mode === 'run' && row >= 19) {
+                        if (col < 8) drawY += walkOffset;
+                        else drawY -= walkOffset;
+                    }
+
+                    if (mode === 'fly') {
+                        let angle = Math.min(Math.max(vy * 0.01, -0.25), 0.25);
+                        ctx.save();
+                        ctx.translate(x + 16, y + 24);
+                        ctx.rotate(angle);
+                        ctx.fillRect(col * pSize - 16, row * pSize - 24, pSize, pSize);
+                        ctx.restore();
+                    } else {
+                        ctx.fillRect(drawX, drawY, pSize, pSize);
+                    }
+                }
+            }
+        }
+        ctx.restore();
+    }
+
+    function drawCollectable(ctx, x, y, type, frame) {
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        let floatOffset = Math.sin(frame * 0.1 + x) * 4;
+        let drawY = y + floatOffset;
+        let color = '#00ffcc'; 
+        if (type === 1) color = '#ff0055'; 
+        if (type === 2) color = '#ffff00'; 
+        if (type === 3) color = '#bc34fa'; 
+        const p = 2; 
+
+        if (type % 2 === 0) {
+            let shape = [
+                [0,0,0,4,4,4,0,0,0], [0,0,0,4,0,4,0,0,0], [0,0,0,4,0,4,0,0,0],
+                [0,0,4,4,0,4,4,0,0], [0,4,4,1,1,1,4,4,0], [4,4,1,1,1,1,1,4,4],
+                [4,1,1,1,1,1,1,1,4], [4,1,1,1,1,1,1,1,4], [4,4,4,4,4,4,4,4,4]
+            ];
+            drawShape(ctx, x, drawY, shape, {'4': '#ffffff', '1': color}, p);
+        } else {
+            let shape = [
+                [0,0,0,4,4,4,0,0,0], [0,0,0,4,0,4,0,0,0], [0,0,0,4,0,4,0,0,0],
+                [0,0,4,4,1,4,4,0,0], [0,4,4,1,1,1,4,4,0], [4,4,1,1,1,1,1,4,4],
+                [4,1,1,1,1,1,1,1,4], [0,4,4,1,1,1,4,4,0], [0,0,4,4,4,4,4,0,0]
+            ];
+            drawShape(ctx, x, drawY, shape, {'4': '#ffffff', '1': color}, p);
+        }
+        ctx.restore();
+    }
+
+    function drawObstacle(ctx, x, y, type, width, height) {
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        if (type === 'barrel') {
+            let barrelShape = [
+                [0,4,4,4,4,4,4,4,0], [4,3,3,3,3,3,3,3,4], [4,5,5,5,5,5,5,5,4],
+                [4,3,3,1,1,1,3,3,4], [4,3,1,1,1,1,1,3,4], [4,3,3,1,1,1,3,3,4],
+                [4,5,5,5,5,5,5,5,4], [4,3,3,3,3,3,3,3,4], [0,4,4,4,4,4,4,4,0]
+            ];
+            drawShape(ctx, x, y, barrelShape, {'4': '#222', '3': '#2d7d2d', '5': '#55aa55', '1': '#00ff00'}, width / 9);
+        } else if (type === 'box') {
+            let boxShape = [
+                [4,4,4,4,4,4,4,4,4], [4,3,3,3,3,3,3,5,4], [4,3,5,3,3,3,5,3,4],
+                [4,3,3,5,3,5,3,3,4], [4,3,3,3,5,3,3,3,4], [4,3,3,5,3,5,3,3,4],
+                [4,3,5,3,3,3,5,3,4], [4,5,3,3,3,3,3,3,4], [4,4,4,4,4,4,4,4,4]
+            ];
+            drawShape(ctx, x, y, boxShape, {'4': '#4a2506', '3': '#8a4b16', '5': '#b56d31'}, width / 9);
+        } else {
+            let signShape = [
+                [0,0,0,0,4,0,0,0,0], [0,0,0,4,1,4,0,0,0], [0,0,4,1,1,1,4,0,0],
+                [0,4,1,1,2,1,1,4,0], [4,1,1,1,2,1,1,1,4], [4,1,1,1,2,1,1,1,4],
+                [4,1,1,1,0,1,1,1,4], [4,1,1,1,2,1,1,1,4], [4,4,4,4,4,4,4,4,4]
+            ];
+            drawShape(ctx, x, y, signShape, {'4': '#000000', '1': '#ffcc00', '2': '#000000'}, width / 9);
+        }
+        ctx.restore();
+    }
+
+    function drawShape(ctx, x, y, matrix, colorMap, pixelSize) {
+        for (let r = 0; r < matrix.length; r++) {
+            for (let c = 0; c < matrix[r].length; c++) {
+                let val = matrix[r][c];
+                if (val !== 0 && colorMap[val]) {
+                    ctx.fillStyle = colorMap[val];
+                    ctx.fillRect(x + c * pixelSize, y + r * pixelSize, pixelSize + 0.5, pixelSize + 0.5);
+                }
+            }
+        }
+    }
+
+    function drawPortal(ctx, x, y, targetMode, frame) {
+        ctx.save();
+        let color = targetMode === 'fly' ? '#00ffff' : '#ff00ff';
+        let pulse = Math.sin(frame * 0.1) * 4;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 5;
+        
+        ctx.beginPath();
+        ctx.ellipse(x + 20, y + 50, 20 + pulse, 50, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.beginPath();
+        ctx.ellipse(x + 20, y + 50, 10 + pulse * 0.5, 40, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#444';
+        ctx.fillRect(x, y - 5, 40, 10);
+        ctx.fillRect(x, y + 95, 40, 10);
+        
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x + 20, y - 5);
+        ctx.lineTo(x + 20, 0);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+
+    function showMenu() {
+        if (loopId) {
+            cancelAnimationFrame(loopId);
+            loopId = null;
+        }
+        startMenu.style.display = 'flex';
+        gameOverScreen.style.display = 'none';
+        victoryScreen.style.display = 'none';
+        gameActive = false;
+        resetGameVariables();
+    }
+
+    function resetGameVariables() {
+        score = 0;
+        gameTime = 0;
+        cameraX = 0;
+        isPressed = false;
+        obstacles = [];
+        collectables = [];
+        portals = [];
+        particles = [];
+        lastGeneratedX = 400;
+        portalActive = false;
+        currentGeneratorMode = 'run';
+
+        player = {
+            x: 100,
+            y: floorY - 48,
+            w: 32,
+            h: 48,
+            vy: 0,
+            mode: 'run', 
+            onGround: true,
+            speed: 500 
+        };
+
+        hudScore.textContent = '0';
+        hudMode.textContent = 'LAUFEN';
+    }
+
+    function startGame(level) {
+        if (loopId) {
+            cancelAnimationFrame(loopId);
+            loopId = null;
+        }
+
+        resetGameVariables(); 
+        currentLevel = level;
+        gameActive = true;
+
+        startMenu.style.display = 'none';
+        gameOverScreen.style.display = 'none';
+        victoryScreen.style.display = 'none';
+
+        // Stufenweise Geschwindigkeitssteigerungen (Jetzt massiv angezogen!)
+        if (level === 1) {
+            player.speed = 490; // Startet bereits rasant
+            hudLevelName.textContent = 'LEVEL 1';
+            hudHighscoreContainer.style.display = 'none';
+            distanceToVictory = 15000; 
+        } else if (level === 2) {
+            player.speed = 570; // Noch schneller
+            hudLevelName.textContent = 'LEVEL 2';
+            hudHighscoreContainer.style.display = 'none';
+            distanceToVictory = 18000; 
+        } else if (level === 3) {
+            player.speed = 660; // Absolute Schallgeschwindigkeit
+            hudLevelName.textContent = 'LEVEL 3';
+            hudHighscoreContainer.style.display = 'none';
+            distanceToVictory = 22000; 
+        } else if (level === 'endless') {
+            player.speed = 480; // Solider Start im Endlosmodus
+            hudLevelName.textContent = 'ENDLOS';
+            hudHighscoreContainer.style.display = 'block';
+            hudHighscore.textContent = highscore;
+            distanceToVictory = Infinity;
+        }
+
+        lastTime = performance.now();
+        tick(lastTime);
+    }
+
+    function restartGame() {
+        startGame(currentLevel);
+    }
+
+    function nextLevel() {
+        if (currentLevel === 1) startGame(2);
+        else if (currentLevel === 2) startGame(3);
+        else showMenu();
+    }
+
+    function handleProceduralGeneration() {
+        let spawnBuffer = 1200; // Größerer Puffer wegen der enormen Geschwindigkeit
+
+        while (lastGeneratedX < cameraX + spawnBuffer) {
+            let minGap = 380;
+            let maxGap = 580;
+
+            if (currentLevel === 1) {
+                minGap = 460; 
+                maxGap = 660;
+            } else if (currentLevel === 3 || (currentLevel === 'endless' && score > 200)) {
+                minGap = 320; 
+                maxGap = 460; // Engere Hindernisse bei extremem Speed
+            }
+
+            lastGeneratedX += minGap + Math.random() * (maxGap - minGap);
+
+            if (currentLevel !== 'endless' && lastGeneratedX > distanceToVictory - 300) {
+                break;
+            }
+
+            if (currentLevel !== 1 && Math.random() < 0.12 && !portalActive && lastGeneratedX > 800) {
+                let nextMode = currentGeneratorMode === 'run' ? 'fly' : 'run';
+                portals.push({
+                    x: lastGeneratedX,
+                    y: floorY - 100,
+                    targetMode: nextMode
+                });
+                currentGeneratorMode = nextMode;
+                portalActive = true;
+                lastGeneratedX += 600; 
+                continue;
+            }
+
+            portalActive = false;
+
+            if (currentGeneratorMode === 'run') {
+                let type = Math.random() > 0.5 ? 'box' : 'barrel';
+                obstacles.push({
+                    x: lastGeneratedX,
+                    y: floorY - 36,
+                    w: 36,
+                    h: 36,
+                    type: type
+                });
+
+                collectables.push({
+                    x: lastGeneratedX - 180,
+                    y: floorY - 80 - Math.random() * 90,
+                    type: Math.floor(Math.random() * 4),
+                    collected: false
+                });
+            } else {
+                if (Math.random() > 0.5) {
+                    obstacles.push({
+                        x: lastGeneratedX,
+                        y: 40,
+                        w: 36,
+                        h: 120 + Math.random() * 60,
+                        type: 'sign'
+                    });
+                } else {
+                    obstacles.push({
+                        x: lastGeneratedX,
+                        y: floorY - 36,
+                        w: 36,
+                        h: 36,
+                        type: 'barrel'
+                    });
+                }
+
+                collectables.push({
+                    x: lastGeneratedX,
+                    y: 120 + Math.random() * 140,
+                    type: Math.floor(Math.random() * 4),
+                    collected: false
+                });
+            }
+        }
+
+        if (obstacles.length > 50) obstacles.shift();
+        if (collectables.length > 50) collectables.shift();
+        if (portals.length > 10) portals.shift();
+    }
+
+    function createExplosion(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+            particles.push({
+                x: x,
+                y: y,
+                vx: (Math.random() - 0.5) * 250,
+                vy: (Math.random() - 0.5) * 250,
+                size: Math.random() * 2.5 + 1,
+                color: color,
+                alpha: 1,
+                decay: Math.random() * 1.5 + 0.8
+            });
+        }
+    }
+
+    function updateParticles(dt) {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.alpha -= p.decay * dt;
+            if (p.alpha <= 0) {
+                particles.splice(i, 1);
+            }
+        }
+    }
+
+    function drawParticles(ctx) {
+        particles.forEach(p => {
+            ctx.save();
+            ctx.globalAlpha = p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x - cameraX, p.y, p.size, p.size);
+            ctx.restore();
+        });
+    }
+
+    function checkCollision(rect1, rect2) {
+        return rect1.x + 4 < rect2.x + rect2.w &&
+               rect1.x + rect1.w - 4 > rect2.x &&
+               rect1.y + 4 < rect2.y + rect2.h &&
+               rect1.y + rect1.h - 4 > rect2.y;
+    }
+
+    function triggerGameOver() {
+        gameActive = false;
+        gameOverScreen.style.display = 'flex';
+        goStats.textContent = `Punkte erzielt: ${score}`;
+        
+        if (currentLevel === 'endless') {
+            if (score > highscore) {
+                highscore = score;
+                localStorage.setItem('paula_highscore', highscore);
+                goTitle.textContent = "NEUER HIGHSCORE!";
+                goTitle.style.color = "#00ffcc";
+            } else {
+                goTitle.textContent = "Endlosmodus beendet!";
+                goTitle.style.color = "#ff5e97";
+            }
+        } else {
+            goTitle.textContent = "Kollision im Labor!";
+            goTitle.style.color = "#ff3333";
+        }
+
+        createExplosion(player.x + 16, player.y + 24, '#ff5e97', 20);
+        createExplosion(player.x + 16, player.y + 24, '#ffffff', 10);
+    }
+
+    function triggerVictory() {
+        gameActive = false;
+        victoryScreen.style.display = 'flex';
+        vicStats.textContent = `Sämtliche Daten gesichert. Deine Punkte: ${score}`;
+        vicTitle.textContent = `Level ${currentLevel} absolviert!`;
+
+        if (currentLevel === 3) {
+            nextLevelBtn.style.display = 'none'; 
+        } else {
+            nextLevelBtn.style.display = 'block';
+        }
+
+        for (let i = 0; i < 4; i++) {
+            setTimeout(() => {
+                createExplosion(player.x + 100 + i * 40, floorY - 120, '#00ffcc', 12);
+            }, i * 200);
+        }
+    }
+
+    function update(dt) {
+        if (!gameActive) return;
+
+        gameTime += dt * 60; 
+        handleProceduralGeneration();
+
+        // Dynamisches Scaling für den Endlosmodus: Je mehr Punkte, desto extremer das Tempo!
+        if (currentLevel === 'endless') {
+            player.speed = 480 + (score * 2.8); // Skaliert schneller nach oben
+            if (player.speed > 850) player.speed = 850; // Absolutes Höchstlimit zum Schutz der Spielbarkeit
+        }
+
+        player.x += player.speed * dt;
+        cameraX = player.x - 150;
+
+        if (currentLevel !== 'endless' && player.x >= distanceToVictory) {
+            triggerVictory();
+            return;
+        }
+
+        // --- ZEITBASIERTE PHYSIK ---
+        if (player.mode === 'run') {
+            hudMode.textContent = 'LAUFEN';
+            hudMode.style.color = '#00ffcc';
+
+            player.vy += gravity * dt * 60;
+            if (player.vy > terminalVelocity) player.vy = terminalVelocity;
+            player.y += player.vy * dt * 60;
+
+            if (player.y >= floorY - player.h) {
+                player.y = floorY - player.h;
+                player.vy = 0;
+                player.onGround = true;
+            }
+
+            if (player.onGround && Math.random() < 0.5) {
+                particles.push({
+                    x: player.x,
+                    y: floorY - 2,
+                    vx: -80,
+                    vy: -Math.random() * 60,
+                    size: Math.random() * 2 + 1,
+                    color: '#65657a',
+                    alpha: 0.5,
+                    decay: 2.0
+                });
+            }
+        } 
+        else if (player.mode === 'fly') {
+            hudMode.textContent = 'FLIEGEN';
+            hudMode.style.color = '#ff00ff';
+
+            if (isPressed) {
+                player.vy += flightThrust * dt * 60; 
+            } else {
+                player.vy += gravity * 0.8 * dt * 60; 
+            }
+
+            if (player.vy > (terminalVelocity - 4)) player.vy = terminalVelocity - 4;
+            if (player.vy < (-terminalVelocity + 4)) player.vy = -terminalVelocity + 4;
+
+            player.y += player.vy * dt * 60;
+
+            if (player.y <= 40) {
+                player.y = 40;
+                player.vy = 1.0;
+            }
+            if (player.y >= floorY - player.h) {
+                player.y = floorY - player.h;
+                player.vy = -1.0;
+            }
+
+            if (Math.random() < 0.7) {
+                particles.push({
+                    x: player.x,
+                    y: player.y + 28,
+                    vx: -player.speed * 0.5,
+                    vy: (Math.random() - 0.5) * 100,
+                    size: Math.random() * 3 + 1,
+                    color: isPressed ? '#ff00ff' : '#00ffff', 
+                    alpha: 0.8,
+                    decay: 1.8
+                });
+            }
+        }
+
+        portals.forEach(portal => {
+            if (checkCollision({x: player.x, y: player.y, w: player.w, h: player.h}, {x: portal.x, y: 0, w: 40, h: floorY})) {
+                if (player.mode !== portal.targetMode) {
+                    player.mode = portal.targetMode;
+                    createExplosion(player.x + 16, player.y + 24, portal.targetMode === 'fly' ? '#00ffff' : '#ff00ff', 15);
+                }
+            }
+        });
+
+        for (let i = 0; i < obstacles.length; i++) {
+            let obs = obstacles[i];
+            if (checkCollision({x: player.x, y: player.y, w: player.w, h: player.h}, obs)) {
+                triggerGameOver();
+                return;
+            }
+        }
+
+        for (let i = 0; i < collectables.length; i++) {
+            let col = collectables[i];
+            if (!col.collected && checkCollision({x: player.x, y: player.y, w: player.w, h: player.h}, {x: col.x, y: col.y, w: 18, h: 18})) {
+                col.collected = true;
+                score += 10;
+                hudScore.textContent = score;
+                createExplosion(col.x + 9, col.y + 9, '#ffff00', 8);
+            }
+        }
+
+        updateParticles(dt);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.strokeStyle = '#1f1f2e';
+        ctx.lineWidth = 1;
+        let startGridX = -(cameraX % 40);
+        for (let x = startGridX; x < canvas.width; x += 40) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+        }
+
+        ctx.fillStyle = '#222233';
+        ctx.fillRect(0, floorY, canvas.width, canvas.height - floorY);
+        ctx.fillStyle = '#ff5e97';
+        ctx.fillRect(0, floorY, canvas.width, 4);
+
+        if (currentLevel !== 'endless' && distanceToVictory > 0) {
+            let goalX = distanceToVictory - cameraX;
+            if (goalX < canvas.width + 100) {
+                ctx.fillStyle = '#33ff33';
+                ctx.fillRect(goalX, floorY - 120, 15, 120);
+                ctx.shadowColor = '#33ff33';
+                ctx.shadowBlur = 15;
+                ctx.fillStyle = 'rgba(51, 255, 51, 0.2)';
+                ctx.fillRect(goalX - 20, floorY - 120, 55, 120);
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        portals.forEach(p => {
+            if (p.x - cameraX > -100 && p.x - cameraX < canvas.width + 100) {
+                drawPortal(ctx, p.x - cameraX, p.y, p.targetMode, gameTime);
+            }
+        });
+
+        collectables.forEach(c => {
+            if (!c.collected && c.x - cameraX > -50 && c.x - cameraX < canvas.width + 50) {
+                drawCollectable(ctx, c.x - cameraX, c.y, c.type, gameTime);
+            }
+        });
+
+        obstacles.forEach(o => {
+            if (o.x - cameraX > -100 && o.x - cameraX < canvas.width + 100) {
+                drawObstacle(ctx, o.x - cameraX, o.y, o.type, o.w, o.h);
+            }
+        });
+
+        drawParticles(ctx);
+        drawPaula(ctx, player.x - cameraX, player.y, gameTime, player.mode, player.vy);
+    }
+
+    function tick(timestamp) {
+        if (!gameActive) return;
+        
+        let dt = (timestamp - lastTime) / 1000;
+        if (dt > 0.1) dt = 0.1; 
+        
+        lastTime = timestamp;
+
+        update(dt);
+        draw();
+        
+        loopId = requestAnimationFrame(tick);
+    }
+
+    showMenu();
+</script>
+
+</body>
+</html>
